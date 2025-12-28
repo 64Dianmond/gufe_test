@@ -3,7 +3,7 @@ import os
 import re
 from openai import OpenAI
 from dotenv import load_dotenv
-from cal1 import SentencingCalculator, SENTENCING_TOOLS, execute_tool_call
+from cal_dq import SentencingCalculator, SENTENCING_TOOLS, execute_tool_call
 
 # 加载环境变量
 load_dotenv()
@@ -25,7 +25,7 @@ class SentencingPredictor:
             base_url=os.getenv("OPENAI_BASE_URL")
         )
         self.model_name = os.getenv("OPENAI_MODEL", "qwen-max")
-        self.temperature_task1 = 1.0  # Task1使用较高温度以增加多样性
+        self.temperature_task1 = 0.1  # Task1使用较高温度以增加多样性
         self.temperature_task2 = 0.1  # Task2使用较低温度以确保稳定性
         self.max_tokens = 32768
 
@@ -44,51 +44,54 @@ class SentencingPredictor:
             if "盗窃" in crime: return "盗窃罪"
             if "故意伤害" in crime: return "故意伤害罪"
             if "诈骗" in crime: return "诈骗罪"
+            if "职务侵占" in crime: return "职务侵占罪"
 
         # 2. 如果指控不明确,使用关键词作为备用方案
         theft_keywords = ["盗窃", "窃取", "扒窃", "盗走"]
         injury_keywords = ["故意伤害", "殴打", "打伤", "轻伤", "重伤"]
         fraud_keywords = ["诈骗", "骗取", "虚构事实"]
+        embezzlement_keywords = ["职务侵占", "挪用资金", "非法占有"]
 
         if any(k in text for k in theft_keywords): return "盗窃罪"
         if any(k in text for k in injury_keywords): return "故意伤害罪"
         if any(k in text for k in fraud_keywords): return "诈骗罪"
+        if any(k in text for k in embezzlement_keywords): return "职务侵占罪"
 
         # 3. 默认回退,根据数据集的多数罪名来定,此处以盗窃罪为例
         return "盗窃罪"
 
-    # def extract_region(self, defendant_info, case_description):
-    #     """
-    #     从案件信息中提取地区信息
-    #     """
-    #     text = defendant_info + case_description
-    #     # 常见的地区关键词
-    #     regions = ["北京", "上海", "天津", "重庆", "河北", "山西", "辽宁", "吉林",
-    #               "黑龙江", "江苏", "浙江", "安徽", "福建", "江西", "山东", "河南",
-    #               "湖北", "湖南", "广东", "海南", "四川", "贵州", "云南", "陕西",
-    #               "甘肃", "青海", "台湾", "内蒙古", "广西", "西藏", "宁夏", "新疆",
-    #               "香港", "澳门"]
-    #
-    #     # 常见的城市关键词
-    #     cities = ["江门", "深圳", "广州", "珠海", "佛山", "东莞", "中山", "杭州",
-    #              "宁波", "温州", "嘉兴", "绍兴", "台州", "义乌", "南京", "苏州",
-    #              "无锡", "常州", "徐州", "济南", "青岛", "烟台", "潍坊", "大连",
-    #              "沈阳", "哈尔滨", "长春", "成都", "西安", "武汉", "长沙", "福州",
-    #              "厦门", "贵阳", "昆明", "南宁", "石家庄", "太原", "南昌", "合肥",
-    #              "郑州", "海口", "乌鲁木齐", "呼和浩特", "银川", "西宁", "拉萨", "兰州"]
-    #
-    #     # 先尝试查找省份
-    #     for region in regions:
-    #         if region in text:
-    #             return region
-    #
-    #     # 如果没有找到省份，尝试查找城市
-    #     for city in cities:
-    #         if city in text:
-    #             return city
-    #
-    #     # 如果没有找到明确的地区，返回默认值
-    #     return "default"
+    def extract_region(self, defendant_info, case_description):
+        """
+        从案件信息中提取地区信息
+        """
+        text = defendant_info + case_description
+        # 常见的地区关键词
+        regions = ["北京", "上海", "天津", "重庆", "河北", "山西", "辽宁", "吉林",
+                   "黑龙江", "江苏", "浙江", "安徽", "福建", "江西", "山东", "河南",
+                   "湖北", "湖南", "广东", "海南", "四川", "贵州", "云南", "陕西",
+                   "甘肃", "青海", "台湾", "内蒙古", "广西", "西藏", "宁夏", "新疆",
+                   "香港", "澳门"]
+
+        # 常见的城市关键词
+        cities = ["江门", "深圳", "广州", "珠海", "佛山", "东莞", "中山", "杭州",
+                  "宁波", "温州", "嘉兴", "绍兴", "台州", "义乌", "南京", "苏州",
+                  "无锡", "常州", "徐州", "济南", "青岛", "烟台", "潍坊", "大连",
+                  "沈阳", "哈尔滨", "长春", "成都", "西安", "武汉", "长沙", "福州",
+                  "厦门", "贵阳", "昆明", "南宁", "石家庄", "太原", "南昌", "合肥",
+                  "郑州", "海口", "乌鲁木齐", "呼和浩特", "银川", "西宁", "拉萨", "兰州"]
+
+        # 先尝试查找省份
+        for region in regions:
+            if region in text:
+                return region
+
+        # 如果没有找到省份，尝试查找城市
+        for city in cities:
+            if city in text:
+                return city
+
+        # 如果没有找到明确的地区，返回默认值
+        return "default"
 
     def build_prompt_task1_authoritative(self, defendant_info, case_description):
         """
@@ -97,76 +100,190 @@ class SentencingPredictor:
         """
         crime_type = self.identify_crime_type(defendant_info, case_description)
 
-        prompt = f"""你是一位极其严谨的刑事法官,任务是依据《中华人民共和国刑法》及相关量刑指导意见,从案情中提取所有对量刑有影响的关键情节。
-**特别注意:**
-**重要提示:** 本任务将根据F1值进行评分，F1值是精确率(Precision)和召回率(Recall)的调和平均数。这意味着你需要在确保提取准确性的同时，尽可能完整地提取所有相关情节。错误提取会同时降低精确率和召回率，因此请优先确保准确性。
-请明确标注是否存在"法定减轻处罚情节",这类情节包括:
-- 自首
-- 立功(重大立功)
-- 未成年人犯罪
-- 从犯
-- 防卫过当
-- 犯罪预备、中止、未遂
+        # 获取地区信息
+        region = self.extract_region(defendant_info, case_description)
 
-如果存在上述情节,请在输出中包含"法定减轻"这一标签。    
+        # 构建地区特定的数额标准说明
+        amount_standards = self._get_amount_standards_for_prompt(crime_type, region)
 
-**案件信息:**
-被告人信息:{defendant_info}
-案情描述:{case_description}
+        prompt = f"""你是一位极其严谨的刑事法官。你的任务是阅读案件事实,按照中国刑法以及量刑指导意见,从中**系统、完整且准确地**提取所有对量刑有影响的关键情节。
 
-**本案罪名(初步判断):** {crime_type}
+请在内部按如下两个阶段进行推理,但最终**只输出最后的情节标签 JSON 数组**,不要展示你的推理过程。
 
-**提取总要求:**
-- **平衡准确性和完整性**: 优先确保提取情节的准确性，宁可少提取也不要提取错误的情节，因为错误提取会同时降低精确率和召回率。
-- **处理边界情况**: 对于模糊或不确定的情节，只有在有明确证据支持时才提取，避免猜测性提取
+【评测说明】不大本任务用 F1 值进行评测,需要在"准确"和"完整"之间取得平衡:
+- 不允许凭空捏造情节,也不允许与案情矛盾;
+- 对于案情中已经**明确记载或可以直接、唯一推导出来**的情节,应当尽可能完整地提取,避免遗漏。
 
----
-**请按照以下分类和指引进行提取:**
+-------------------------
+【阶段一(在你内部进行,不要输出): 事实要点梳理】
 
-**一、 犯罪构成与基本事实情节 (决定量刑起点和基准刑)**
-- **犯罪数额/后果**: 必须明确为 **"盗窃/诈骗金额既遂XX元"** 或 **"故意伤害致X人轻伤/重伤X级"** 或 **"故意伤害致X人死亡"**。
-- **数额/后果档次**: 必须明确标注 **"盗窃/诈骗数额较大/巨大/特别巨大"**。
-- **犯罪手段/方式**: 提取特殊手段,如 **"入户盗窃"、"携带凶器盗窃"、"扒窃"、"电信网络诈骗"** 等。
-- **犯罪次数**: 如 **"多次盗窃"**、**"多次诈骗"**。
+围绕以下问题,在你内部整理一个"事实要点表"(不要输出):
 
-**二、 法定从重、从轻、减轻处罚情节 (必须依法调节)**
-- **累犯**: 重点核查被告人信息中的前科记录,判断是否构成累犯(一般为有期徒刑执行完毕或赦免以后,五年以内再犯应当判处有期徒刑以上刑罚之罪)。
-- **自首**: 重点核查归案方式,如主动投案,或"形迹可疑,经盘问、教育后,主动交代了司法机关未掌握的罪行","在案发地等候处置"等均可能构成自首。
-- **立功**: 是否有检举、揭发他人犯罪行为,经查证属实等情况。
-- **未成年人犯罪**: 被告人犯罪时是否已满十四周岁不满十八周岁。
-- **从犯/胁从犯**: 在共同犯罪中的作用。
-- **犯罪预备/中止/未遂**。
+1. 数额与次数
+- 涉案金额是多少? 是既遂还是未遂?
+- 有几次盗窃/诈骗/犯罪行为? 原文如何表述?
 
-**三、 酌定从重、从轻处罚情节 (可以酌情调节)**
-- **坦白**: 被动归案后,如实供述自己罪行的。
-- **认罪认罚**: 是否自愿如实供述自己的罪行,承认指控的犯罪事实,愿意接受处罚。
-- **退赃/退赔/赔偿**: 是否退还赃款赃物,或赔偿被害人经济损失。必须量化,如 **"退赔XX元"**。
-- **取得谅解**: 是否取得了被害人的书面或口头谅解。
-- **前科**: 不构成累犯,但有犯罪记录的。
-- **被害人过错** (主要适用于故意伤害罪): 案件起因是否由被害人过错引起。
-- **多次犯罪**: 是否存在多次实施同种犯罪行为的情况，如"多次盗窃"、"多次诈骗"等。
-- **其他**: 如诈骗残疾人、老年人等特定群体财物,属于酌情从重情节。
+2. 手段与客体
+- 是否提到特定犯罪方式: 入户盗窃、扒窃、携带凶器盗窃、电信网络诈骗等?
+- 是否有故意伤害致轻伤/重伤/死亡的结果?
 
----
-**输出格式:**
-只输出一个JSON数组,包含所有提取到的情节字符串。不要任何解释或Markdown标记。
+3. 被告人人身情况与前科
+- 是否有前科? 前科是指被告人在本案之前因犯罪受过刑罚处罚的经历。
+- 能否构成累犯?构成累犯的法律条件为：在前罪刑罚执行完毕或赦免后5年内，再犯应当判处有期徒刑以上刑罚之罪。
+- 案件一旦依法认定被告人为累犯，在量刑时仅以“累犯”作为从重情节予以评价。对已作为累犯基础的同一前科，不得再单独作为“有前科”的独立从重情节进行叠加评价，以避免重复评价
+- 请严肃区分累犯与前科。
 
-**重要原则:**
-- 只提取案件事实中明确提及的情节，不要包含推测或假设的情节
-- 宁可少提取也不要提取不准确的情节
-- 确保每个提取的情节都有明确的事实依据
-- 如果存在法定减轻情节，必须包含"法定减轻"标签
+4. 归案经过与供述情况
+- 是抓捕归案,还是主动投案?
+- 是否如实供述自己的罪行(坦白)?
+- 是否在庭审或侦查阶段认罪认罚?
 
-**示例({crime_type}):**
-["盗窃金额既遂3631元", "盗窃数额较大", "扒窃", "累犯", "坦白"]
+5. 退赃、退赔与谅解
+- 是否退赃/退赔? 退赔数额是多少?
+- 是否取得被害人的谅解(有无明确记载)?
 
-**另一个示例({crime_type}):**
-["诈骗金额既遂35700元", "诈骗数额巨大", "多次盗窃", "自首", "退赔35570元", "认罪认罚", "法定减轻"]
+6. 其他
+- 是否有"多次盗窃"的表述?二年内盗窃三次以上即构成“多次盗窃”，不论每次数额是否达到当地“数额较大”的起点，也无需累计金额达标，只要满三次就多次盗窃
+- 是否有未成年人、从犯、犯罪未遂、中止、防卫过当等典型法定减轻或从重情节?
+- 是否有主犯情节?
+- 是否是主犯、是否有教唆他人犯罪等情节?
+- 是否针对弱势群体(老年人、残疾人、未成年人等)实施犯罪?
+- 是否在重大灾害期间实施犯罪?
 
-**故意伤害罪示例:**
-["故意伤害致1人死亡", "自首", "赔偿500000元", "取得谅解", "被害人过错", "法定减轻"]
+-------------------------
+【阶段二(需要输出): 将事实映射为标准化情节标签】
+
+根据你在阶段一梳理的事实,使用**下面给定的固定模版**输出情节标签。禁止使用未列出的新表述。
+
+1. 数额与后果类(根据罪名选择)——金额必须来自原文:
+- "盗窃金额既遂XXXX元" / "盗窃金额未遂XXXX元"
+- "诈骗金额既遂XXXX元" / "诈骗金额未遂XXXX元"
+- "职务侵占金额既遂XXXX元"
+- "故意伤害致X人轻伤"
+- "故意伤害致X人重伤X级"
+- "故意伤害致X人死亡"
+
+2. 数额档次(必须严格按照下面提供的地区标准来判断，并且只有在可以唯一确定时才输出):
+- "盗窃数额较大" / "盗窃数额巨大" / "盗窃数额特别巨大"
+- "诈骗数额较大" / "诈骗数额巨大" / "诈骗数额特别巨大"
+- "职务侵占数额较大" / "职务侵占数额巨大" / "职务侵占数额特别巨大"
+
+**数额判断标准（基于案件地区）**:
+{amount_standards}
+
+3. 次数与多次犯罪:
+- "盗窃次数X次"
+- "诈骗次数X次"
+- "多次盗窃"
+- "多次诈骗"
+- "多次犯罪"
+
+4. 犯罪手段/方式(仅当案情有明确记载时使用,表述要贴近原文):
+- "入户盗窃"
+- "扒窃"
+- "携带凶器盗窃"
+- "电信网络诈骗"
+- 其他类似特殊方式,仅在原文明确出现时使用。
+
+5. 法定从重、从轻、减轻情节(只要构成,即使没有写出"从重/从轻"字样,也要输出):
+- "累犯"
+- "自首"
+- "立功"
+- "重大立功"
+- "未成年人犯罪"
+- "从犯"
+- "胁从犯"
+- "主犯"
+- "犯罪预备"
+- "犯罪中止"
+- "犯罪未遂"
+
+6. 酌定量刑情节:
+- "坦白"               # 被动到案后如实供述自己罪行
+- "认罪认罚"           # 自愿认罪并同意签署具结书
+- "退赔XXXX元" / "退赃XXXX元" / "退赔全部损失"
+- "取得谅解"
+- "前科"
+- "被害人过错"
+- "多次盗窃"
+- "多次诈骗"
+- "多次犯罪"
+
+
+7. 法定减轻标签:
+- 如果存在"自首、立功/重大立功、未成年人犯罪、从犯/胁从犯、主犯、犯罪预备、中止、未遂、防卫过当"等任意一种,请在输出数组中额外加入一个标签: "法定减轻"。
+
+【严格限制】
+- 金额、次数等数字必须与案情原文完全一致。
+- 如果某类信息原文完全没有,就不要输出该类标签。
+- 如果两个标签含义完全重复,只保留一种最标准表达。
+
+-------------------------
+【案件信息】
+案情描述: {case_description}
+本案罪名(初步判断): {crime_type}
+案件地区: {region}
+
+-------------------------
+【最终输出格式要求】
+
+- 最终只输出一个 JSON 数组, 例如:
+  ["盗窃金额既遂3631元", "盗窃次数1次", "盗窃数额较大", "扒窃", "当庭自愿认罪", "前科"]
+- 不要输出任何解释、分析过程或 Markdown。
+- 不要输出键名、字段名, 也不要套一层对象, 直接输出数组本身。
+
 """
         return prompt
+
+    def _get_amount_standards_for_prompt(self, crime_type, region):
+        """
+        根据罪名和地区的数额标准生成提示信息
+        """
+        # 导入计算器中的标准
+        from cal_dq import SentencingCalculator
+
+        # 获取地区标准
+        if region in SentencingCalculator.REGIONAL_STANDARDS:
+            standards = SentencingCalculator.REGIONAL_STANDARDS[region]
+        elif region in SentencingCalculator.REGIONAL_STANDARDS.get("cities_to_provinces", {}):
+            province = SentencingCalculator.REGIONAL_STANDARDS["cities_to_provinces"][region]
+            standards = SentencingCalculator.REGIONAL_STANDARDS[province]
+        else:
+            standards = SentencingCalculator.REGIONAL_STANDARDS["default"]
+
+        # 生成提示文本
+        if crime_type == "盗窃罪" and "theft" in standards:
+            theft_standards = standards["theft"]
+            return f"""**{region}盗窃罪数额标准:**
+- **数额较大**: {theft_standards['large']}元以上不满{theft_standards['huge']}元
+- **数额巨大**: {theft_standards['huge']}元以上不满{theft_standards['especially_huge']}元
+- **数额特别巨大**: {theft_standards['especially_huge']}元以上"""
+
+        elif crime_type == "诈骗罪" and "fraud" in standards:
+            fraud_standards = standards["fraud"]
+            return f"""**{region}诈骗罪数额标准:**
+- **数额较大**: {fraud_standards['large']}元以上不满{fraud_standards['huge']}元
+- **数额巨大**: {fraud_standards['huge']}元以上不满{fraud_standards['especially_huge']}元
+- **数额特别巨大**: {fraud_standards['especially_huge']}元以上"""
+
+        elif crime_type == "职务侵占罪":
+            # 使用河南标准作为默认
+            return """**河南职务侵占罪数额标准:**
+- **数额较大**: 6万元以上不满100万元
+- **数额巨大**: 100万元以上不满1500万元
+- **数额特别巨大**: 1500万元以上"""
+
+        else:
+            # 默认标准
+            return """**全国通用数额标准参考:**
+- **盗窃罪**:
+  - 数额较大: 1000元以上不满30000元
+  - 数额巨大: 30000元以上不满300000元
+  - 数额特别巨大: 300000元以上
+- **诈骗罪**:
+  - 数额较大: 3000元以上不满30000元
+  - 数额巨大: 30000元以上不满500000元
+  - 数额特别巨大: 500000元以上"""
 
     def build_prompt_task2_with_tools(self, defendant_info, case_description, sentencing_factors):
         """
@@ -191,11 +308,16 @@ class SentencingPredictor:
         amount = None
         for factor in sentencing_factors:
             if "盗窃金额既遂" in factor or "诈骗金额既遂" in factor:
-                try:
-                    amount = float(re.search(r'(\d+\.?\d*)元', factor).group(1))
-                except:
-                    pass
-                break
+                # 确保我们提取的是盗窃或诈骗金额，而不是退赔金额
+                if "退赔" not in factor and "退赃" not in factor:
+                    try:
+                        amount = float(re.search(r'(\d+\.?\d*)元', factor).group(1))
+                    except:
+                        pass
+                    break
+
+        # 提取地区信息
+        region = self.extract_region(defendant_info, case_description)
 
         prompt = f"""你是一位精通量刑计算的刑事法官。你必须使用提供的专业计算器工具来进行精确计算,不要自己估算数值。
  **重要约束条件:**
@@ -205,36 +327,67 @@ class SentencingPredictor:
 **已认定的量刑情节:**
 - {factors_str}
 
+**案件地区:** {region}
+
 **你的任务:**
 严格按照以下步骤使用工具进行计算:
 
 **步骤1: 计算基准刑**
-- 使用 `calculate_base_sentence` 工具
-- 根据罪名类型、犯罪事实(金额/伤害等级)和案件地区计算基准刑
+首先，根据已提取的量刑情节和案件信息，使用 `calculate_base_sentence` 工具计算基准刑（单位：月）。
+- 传入参数包括：罪名（crime_type）、涉案金额（amount）、地区（region）等；注意，退赔金额不作为涉案金额（amount）
+- 对于盗窃罪，还需要传入相应的次数参数（theft_count）；
+- 工具会根据地区性的数额标准以及罪名相关的量刑规范，计算出准确的基准刑月份。
 
 **步骤2: 分析和分层情节**
 从上述情节中,识别:
 - **第一层面情节(连乘)**: 未成年人、从犯、胁从犯、犯罪预备、犯罪中止、犯罪未遂
 - **第二层面情节(加减)**: 累犯、自首、坦白、立功、认罪认罚、退赔、取得谅解、前科、多次盗窃、多次犯罪
 
-根据最高人民法院及各地高级人民法院的量刑指导意见，为每个情节确定合适的调节比例:
-- 未成年人: 0.5 (减半)
-- 从犯: 0.8 (减20%)
-- 累犯: 1.3 (增30%)
-- 自首: 0.8 (减20%)
-- 坦白: 0.9 (减10%)
+**标准调节比例参考:**
+
+【法定从重情节】
+- 累犯: 1.30 (增加30%)
+
+【酌定从重情节】
+- 前科: 1.10(增加10%)
+- 犯罪对象为弱势群体: 1.10 (增加10%)
+- 重大灾害期间犯罪: 1.20 (增加20%)
+- 多次盗窃/多次诈骗/多次犯罪: 1.13 (增加13%)
+- 入户盗窃: 1.30 (增加30%)
+- 携带凶器盗窃: 1.2(增加20%)
+- 扒窃: 1.1(增加10%)
+- 主犯: 1.25(增加25%)
+- 教唆未成年人犯罪: 1.2 (增加20%)
+
+【法定从轻、减轻情节】
+- 未成年人: 0.7 (减30%)
+- 从犯: 0.9 (减10%)
+- 胁从犯: 0.8 (减20%)
+- 犯罪预备: 0.5 (减半)
+- 犯罪中止: 0.5 (减半)
+- 犯罪未遂: 0.5 (减50%)
+
+【酌定从轻情节】
+- 自首: 0.75 (减25%)
+- 坦白: 0.75 (减75%)
 - 立功: 0.8 (减20%)
-- 认罪认罚: 0.9 (减10%)
-- 退赃/退赔/取得谅解: 0.95 (减5%)
-- 多次盗窃/多次犯罪: 1.2 (增20%)
+- 重大立功: 0.5 (减半)
+- 认罪认罚: 0.95 (减5%)
+- 退赃/退赔: 0.75 (减75%)
+- 取得谅解: 0.90 (减10%)
+
 
 **步骤3: 计算最终刑期**
 - 使用 `calculate_layered_sentence_with_constraints` 工具
 - 传入基准刑、罪名、金额、第一层面情节列表、第二层面情节列表和是否有法定减轻情节
+- 注意：第一层面和第二层面情节需要以如下格式传入：
+  第一层面: [{{"name": "从犯", "ratio": 0.9}}]
+  第二层面: [{{"name": "自首", "ratio": 0.8}}, {{"name": "认罪认罚", "ratio": 0.95}}, ...]
+  重要：确保使用 "name" 字段而不是 "factor" 字段
 
 **步骤4: 生成刑期区间**
 - 使用 `months_to_range` 工具
-- 将最终月数转换为合理区间(宽度6个月)
+- 将最终月数转换为合理区间
 
 请按顺序调用工具,完成计算后,输出最终的刑期区间。如果刑期区间下限为0，请调整为1
 """
@@ -340,6 +493,46 @@ class SentencingPredictor:
                     print(f"  🔧 调用工具: {function_name}")
                     print(f"     参数: {json.dumps(function_args, ensure_ascii=False)}")
 
+                    # 特殊处理：在调用calculate_base_sentence时，提取盗窃次数参数
+                    if function_name == "calculate_base_sentence" and "crime_type" in function_args and function_args["crime_type"] == "盗窃罪":
+                        # 从量刑情节中提取盗窃次数
+                        theft_count = None
+                        for factor in sentencing_factors:
+                            if "盗窃次数" in factor:
+                                try:
+                                    theft_count = int(re.search(r'盗窃次数(\d+)次', factor).group(1))
+                                    break
+                                except:
+                                    pass
+
+                        if theft_count is not None:
+                            function_args["theft_count"] = theft_count
+                            print(f"     添加盗窃次数参数: {theft_count}")
+                        
+                        # 如果没有盗窃金额，确保amount为None而不是默认值
+                        if "amount" not in function_args:
+                            function_args["amount"] = None
+
+                    # 特殊处理：在调用calculate_base_sentence时，提取诈骗次数参数
+                    if function_name == "calculate_base_sentence" and "crime_type" in function_args and function_args["crime_type"] == "诈骗罪":
+                        # 从量刑情节中提取诈骗次数
+                        fraud_count = None
+                        for factor in sentencing_factors:
+                            if "诈骗次数" in factor:
+                                try:
+                                    fraud_count = int(re.search(r'诈骗次数(\d+)次', factor).group(1))
+                                    break
+                                except:
+                                    pass
+
+                        if fraud_count is not None:
+                            function_args["fraud_count"] = fraud_count
+                            print(f"     添加诈骗次数参数: {fraud_count}")
+                        
+                        # 如果没有诈骗金额，确保amount为None而不是默认值
+                        if "amount" not in function_args:
+                            function_args["amount"] = None
+
                     # 执行工具
                     function_response = execute_tool_call(function_name, function_args)
                     print(f"     结果: {function_response}")
@@ -417,7 +610,7 @@ class SentencingPredictor:
             print(f"  答案2 (刑期预测): {answer2}")
 
             # 每处理10条数据保存一次,防止意外中断丢失进度
-            if (idx + 1) % 10 == 0:
+            if (idx + 1) % 1 == 0:
                 print(f"\n--- 进度保存:已处理 {idx + 1} 条数据 ---")
                 self._save_results(results, output_file)
 
@@ -474,7 +667,7 @@ class SentencingPredictor:
             print(f"  答案2 (刑期预测): {answer2}")
 
             # 每处理10条数据保存一次,防止意外中断丢失进度
-            if (idx + 1) % 10 == 0:
+            if (idx + 1) % 1 == 0:
                 print(f"\n--- 进度保存:已处理 {idx + 1} 条数据 ---")
                 self._save_results(results, output_file)
 
@@ -532,8 +725,8 @@ def main():
     """
     # 配置文件路径
     preprocessed_file = "extracted_info_fusai1.json"
-    fact_file = "data/task6_fusai.jsonl"
-    output_file = "submission_with_tools_fact_1114_235.jsonl"
+    fact_file = "data/dq.jsonl"
+    output_file = "result/submission_with_tools_fact_1124_month6-12.jsonl"
 
     print("=" * 60)
     print(" 法律量刑预测系统 (工具调用版) ")
